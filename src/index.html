@@ -1,0 +1,384 @@
+<title>Tempo Profundo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Syne:wght@600;700;800&display=swap">
+<style>
+/* Layout: mapa em tela cheia como instrumento de observação; trilho de ferramentas à esquerda, gaveta de inspeção à direita, console temporal embaixo. */
+:root {
+  --ground: #0b0f12;
+  --panel: rgba(13, 18, 22, 0.9);
+  --panel-solid: #11171b;
+  --raise: #182026;
+  --line: rgba(214, 222, 204, 0.13);
+  --line-strong: rgba(214, 222, 204, 0.28);
+  --bone: #dedfcf;
+  --dim: #8e978c;
+  --faint: #5b645c;
+  --amber: #e3a95e;
+  --amber-dim: rgba(227, 169, 94, 0.16);
+  --lichen: #a3c290;
+  --rust: #cf6a4c;
+  --ice: #9ec6d2;
+  --f-display: "Syne", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --f-latin: "EB Garamond", Garamond, Georgia, serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--ground); color: var(--bone); font: 14px/1.4 var(--f-body); overflow: hidden; -webkit-font-smoothing: antialiased; user-select: none; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+
+#stage { position: fixed; inset: 0; }
+#stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#c3d[hidden], #c2d[hidden] { display: none !important; }
+#grain { position: fixed; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay; z-index: 5; }
+#vignette { position: fixed; inset: 0; pointer-events: none; z-index: 4; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%); }
+
+.label { font: 500 10.5px/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.latin { font-family: var(--f-latin); font-style: italic; }
+
+/* painéis com cantoneiras de instrumento */
+.panel { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); position: relative; }
+.panel::before, .panel::after { content: ""; position: absolute; width: 9px; height: 9px; border: 1px solid var(--amber); pointer-events: none; opacity: 0.7; }
+.panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+/* placa do planeta */
+#plate { position: fixed; z-index: 10; top: max(14px, env(safe-area-inset-top)); left: max(76px, calc(env(safe-area-inset-left) + 76px)); padding: 12px 16px 12px; min-width: 260px; max-width: calc(100vw - 110px); }
+body.drawer-open #plate { left: 424px; }
+#plate { transition: left .2s ease; }
+#plate h1 { font: 800 26px/1 var(--f-display); letter-spacing: 0.01em; margin: 0; text-transform: uppercase; }
+#plate .des { margin-top: 5px; }
+#plate .stats { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 11px; }
+#plate .stat b { display: block; font: 500 15px/1.1 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--bone); margin-top: 3px; }
+#plate .stat.warn b { color: var(--rust); }
+#plate .stat.good b { color: var(--lichen); }
+
+/* trilho de ferramentas */
+#rail { position: fixed; z-index: 12; top: 0; bottom: 0; left: 0; width: 60px; padding-top: max(14px, env(safe-area-inset-top)); padding-left: env(safe-area-inset-left); display: flex; flex-direction: column; gap: 2px; background: linear-gradient(90deg, rgba(8,11,13,0.92), rgba(8,11,13,0.6)); border-right: 1px solid var(--line); }
+#rail .mark { height: 46px; display: grid; place-items: center; margin-bottom: 8px; }
+#rail button { position: relative; height: 50px; background: none; border: 0; color: var(--dim); display: grid; place-items: center; }
+#rail button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.3; }
+#rail button:hover { color: var(--bone); }
+#rail button.on { color: var(--amber); }
+#rail button.on::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 2px; background: var(--amber); }
+#rail button .tip { position: absolute; left: 58px; top: 50%; transform: translateY(-50%); white-space: nowrap; background: var(--panel-solid); border: 1px solid var(--line); padding: 5px 9px; font: 500 11px/1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--bone); opacity: 0; pointer-events: none; transition: opacity .12s; }
+#rail button:hover .tip { opacity: 1; }
+#rail .spacer { flex: 1; }
+#rail .ver { text-align: center; padding-bottom: max(14px, env(safe-area-inset-bottom)); font-size: 9.5px; letter-spacing: 0.06em; color: var(--faint); }
+
+/* gaveta de ferramenta */
+#drawer { position: fixed; z-index: 35; top: max(14px, env(safe-area-inset-top)); left: 70px; width: 340px; max-width: calc(100vw - 86px); bottom: 104px; display: flex; flex-direction: column; transform: translateX(-12px); opacity: 0; pointer-events: none; transition: transform .2s ease, opacity .2s ease; }
+#drawer.open { transform: none; opacity: 1; pointer-events: auto; }
+.dhead { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.dhead h2 { margin: 0; font: 700 17px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.03em; }
+.dbody { overflow-y: auto; padding: 12px 16px 18px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: thin; scrollbar-color: var(--faint) transparent; }
+.x { background: none; border: 0; color: var(--dim); font: 500 18px/1 var(--f-mono); padding: 2px 4px; }
+.x:hover { color: var(--bone); }
+.hint { color: var(--dim); font-size: 13px; line-height: 1.45; margin: 0; }
+
+/* controles */
+.btn { background: var(--raise); border: 1px solid var(--line-strong); padding: 8px 12px; color: var(--bone); font: 500 12px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 1px; }
+.btn:hover { border-color: var(--amber); color: var(--amber); }
+.btn.primary { background: var(--amber); color: #1a1206; border-color: var(--amber); }
+.btn.primary:hover { background: #f0bb72; color: #1a1206; }
+.btn.danger:hover { border-color: var(--rust); color: var(--rust); }
+.btn.small { padding: 6px 8px; font-size: 10.5px; }
+.btn[disabled] { opacity: .4; pointer-events: none; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); }
+.seg button { background: none; border: 0; padding: 7px 10px; font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.seg button + button { border-left: 1px solid var(--line-strong); }
+.seg button.on { background: var(--amber-dim); color: var(--amber); }
+.field { display: grid; gap: 6px; }
+.field .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.field .top span:last-child { font: 400 12px/1 var(--f-mono); color: var(--bone); font-variant-numeric: tabular-nums; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; }
+input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
+input[type=range]::-moz-range-track { height: 1px; background: var(--line-strong); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 9px; height: 15px; margin-top: -7px; background: var(--bone); border: 0; border-radius: 0; }
+input[type=range]::-moz-range-thumb { width: 9px; height: 15px; background: var(--bone); border: 0; border-radius: 0; }
+input[type=range]:hover::-webkit-slider-thumb { background: var(--amber); }
+input[type=text], select { background: var(--ground); border: 1px solid var(--line-strong); padding: 7px 9px; border-radius: 0; width: 100%; box-sizing: border-box; }
+input[type=text]:focus, select:focus { border-color: var(--amber); outline: none; }
+
+/* cartões de escolha */
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.choice { background: var(--ground); border: 1px solid var(--line); padding: 10px 8px 8px; text-align: left; display: grid; gap: 6px; }
+.choice canvas { width: 100%; height: 44px; }
+.choice b { font: 600 13px/1.1 var(--f-body); }
+.choice small { color: var(--dim); font-size: 11.5px; line-height: 1.25; }
+.choice:hover { border-color: var(--line-strong); }
+.choice.on { border-color: var(--amber); background: rgba(227,169,94,0.06); }
+
+.list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.item { background: var(--panel-solid); padding: 9px 10px; display: grid; gap: 3px; text-align: left; border: 0; }
+.item:hover { background: var(--raise); }
+.item .t { font: italic 500 15px/1.15 var(--f-latin); }
+.item .s { color: var(--dim); font-size: 12px; }
+
+/* inspetor */
+#inspector { position: fixed; z-index: 11; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); width: 360px; max-width: calc(100vw - 28px); bottom: 104px; display: flex; flex-direction: column; transform: translateX(14px); opacity: 0; pointer-events: none; transition: transform .2s ease, opacity .2s ease; }
+#inspector.open { transform: none; opacity: 1; pointer-events: auto; }
+#inspector .dhead { flex-direction: column; align-items: stretch; gap: 6px; }
+#insp-name { font: italic 500 25px/1.05 var(--f-latin); margin: 0; outline: none; }
+#insp-common { font: 500 14px/1.2 var(--f-body); color: var(--dim); outline: none; }
+[contenteditable]:hover { background: rgba(255,255,255,0.03); }
+[contenteditable]:focus { background: rgba(227,169,94,0.08); }
+#specimen { width: 100%; height: 200px; display: block; background: radial-gradient(ellipse at 50% 70%, #1b2228, #0b0f12 70%); border: 1px solid var(--line); }
+.taxa { display: grid; grid-template-columns: 74px 1fr; gap: 3px 10px; font-size: 13px; }
+.taxa dt { color: var(--dim); font: 500 10px/1.9 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; }
+.taxa dd { margin: 0; font-family: var(--f-latin); font-size: 15px; outline: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { border: 1px solid var(--line-strong); background: none; padding: 4px 7px; font: 500 11px/1 var(--f-body); color: var(--dim); }
+.chip.on { border-color: var(--lichen); color: var(--lichen); background: rgba(163,194,144,0.08); }
+.chip:hover { border-color: var(--amber); color: var(--amber); }
+.bar { height: 4px; background: var(--line); position: relative; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--bone); }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.kv div span { display: block; }
+.kv div b { font: 500 13px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+details.genes summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); }
+details.genes summary::-webkit-details-marker { display: none; }
+details.genes summary::after { content: "+"; font-family: var(--f-mono); color: var(--dim); }
+details.genes[open] summary::after { content: "–"; }
+.gene { display: grid; grid-template-columns: 1fr 86px 34px; gap: 8px; align-items: center; font-size: 12.5px; padding: 2px 0; }
+.gene span:last-child { font: 400 11px/1 var(--f-mono); color: var(--dim); text-align: right; }
+
+/* console temporal */
+#console { position: fixed; z-index: 10; left: 70px; right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); height: 80px; display: grid; grid-template-columns: auto auto 1fr auto; align-items: stretch; }
+#console > * { border-right: 1px solid var(--line); }
+#console > *:last-child { border-right: 0; }
+.tc { display: flex; align-items: center; gap: 4px; padding: 0 12px; }
+.tbtn { width: 38px; height: 38px; background: none; border: 1px solid transparent; color: var(--bone); display: grid; place-items: center; }
+.tbtn svg { width: 18px; height: 18px; fill: currentColor; }
+.tbtn:hover { border-color: var(--line-strong); }
+.tbtn.on { color: var(--amber); }
+.speeds { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 12px; }
+.speeds .seg button { padding: 6px 7px; }
+#scale-box { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 14px; min-width: 150px; }
+#scale-box .val { display: flex; align-items: center; gap: 6px; }
+#scale-box .val b { font: 500 14px/1 var(--f-mono); min-width: 120px; }
+#scale-box .val button { width: 22px; height: 22px; background: none; border: 1px solid var(--line-strong); color: var(--bone); font: 500 13px/1 var(--f-mono); padding: 0; }
+#scale-box .val button:hover { border-color: var(--amber); color: var(--amber); }
+#timeline { position: relative; min-width: 0; }
+#rewind-ask { position: absolute; bottom: calc(100% + 10px); width: 300px; padding: 12px 14px; display: grid; gap: 10px; z-index: 3; }
+#rewind-ask p { margin: 0; font-size: 13px; line-height: 1.4; }
+#timeline canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: ew-resize; }
+#clock { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding: 0 16px; min-width: 150px; }
+#clock b { font: 600 22px/1 var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* topo direito */
+#topright { position: fixed; z-index: 10; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; gap: 8px; align-items: flex-start; transition: right .2s; }
+body.insp-open #topright { right: 388px; }
+#layers { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+#layers .seg button { min-width: 38px; }
+#mixer { position: absolute; top: 46px; right: 0; width: 240px; padding: 14px; display: grid; gap: 10px; }
+
+/* crônica */
+#ticker { position: fixed; z-index: 9; left: 74px; bottom: 102px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; max-width: min(520px, calc(100vw - 100px)); }
+.tick { background: rgba(10,14,17,0.82); border-left: 2px solid var(--amber); padding: 6px 10px; font-size: 13px; animation: tickin .35s ease both; }
+.tick.extinção { border-color: var(--rust); }
+.tick.clado { border-color: var(--lichen); }
+.tick.marco { border-color: var(--ice); }
+.tick em { font-family: var(--f-mono); font-style: normal; color: var(--dim); font-size: 11px; margin-right: 8px; }
+@keyframes tickin { from { opacity: 0; transform: translateY(6px); } }
+
+/* atlas filogenético (sobreposição) */
+#atlas { background: var(--panel-solid); position: fixed; z-index: 20; inset: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) 70px; display: grid; grid-template-rows: auto auto 1fr; }
+#atlas .bar2 { display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+#atlas .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); min-height: 0; }
+#tree-wrap { overflow: auto; border-right: 1px solid var(--line); position: relative; min-height: 0; scrollbar-width: thin; }
+#tree { display: block; }
+#table-wrap { overflow: auto; min-height: 0; scrollbar-width: thin; }
+table.sp { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.sp th { position: sticky; top: 0; background: var(--panel-solid); text-align: left; font: 500 10px/1 var(--f-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding: 9px 8px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; z-index: 1; }
+table.sp td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+table.sp tr { cursor: pointer; }
+table.sp tr:hover td { background: rgba(255,255,255,0.025); }
+table.sp tr.sel td { background: var(--amber-dim); }
+table.sp .tree { color: var(--faint); font-family: var(--f-mono); }
+table.sp .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; vertical-align: 0; }
+table.sp .ext { color: var(--rust); }
+table.sp .liv { color: var(--lichen); }
+.d-up { color: var(--lichen); } .d-dn { color: var(--rust); }
+.mini { display: inline-block; width: 38px; height: 4px; background: var(--line); position: relative; vertical-align: middle; }
+.mini i { position: absolute; inset: 0 auto 0 0; background: var(--dim); }
+
+/* tela de gênese */
+#genesis { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-columns: minmax(0, 1fr) 420px; background: radial-gradient(ellipse at 30% 50%, rgba(0,0,0,0) 0%, rgba(5,7,9,0.6) 70%); }
+#genesis .hero { padding: max(28px, env(safe-area-inset-top)) 40px 40px max(40px, env(safe-area-inset-left)); display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+#genesis .hero h1 { font: 800 clamp(44px, 7.5vw, 104px)/0.86 var(--f-display); text-transform: uppercase; margin: 0; letter-spacing: -0.01em; }
+#genesis .hero h1 span { display: block; color: var(--amber); }
+#genesis .hero p { max-width: 430px; color: var(--dim); font-size: 15px; line-height: 1.5; }
+#genesis .side { padding: max(28px, env(safe-area-inset-top)) max(28px, env(safe-area-inset-right)) 28px 28px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; background: linear-gradient(90deg, rgba(11,15,18,0.4), rgba(11,15,18,0.94) 30%); }
+#genesis h2 { font: 800 34px/1 var(--f-display); text-transform: uppercase; margin: 0; }
+.pfacts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.pfacts div { background: var(--panel-solid); padding: 9px 10px; }
+.pfacts b { display: block; font: 500 15px/1.2 var(--f-mono); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+#toast { position: fixed; z-index: 40; left: 50%; top: 18px; transform: translateX(-50%); padding: 9px 14px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: 1; }
+.modehint { position: fixed; z-index: 9; left: 50%; transform: translateX(-50%); bottom: 104px; padding: 7px 12px; font: 500 11px/1 var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+
+@media (max-width: 820px) {
+  #genesis { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  #genesis .hero { padding-bottom: 0; }
+  #genesis .hero p { display: none; }
+  #genesis .side { background: rgba(11,15,18,0.92); }
+  #console { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr 1fr; height: 112px; left: 62px; }
+  .tc { padding: 0 4px; gap: 0; }
+  .tbtn { width: 34px; }
+  #scale-box { min-width: 0; padding: 0 8px; }
+  #scale-box .label, #clock .label { display: none; }
+  #scale-box .val b { min-width: 0; font-size: 12px; white-space: nowrap; }
+  #clock { padding: 0 8px; }
+  #clock b { font-size: 15px; }
+  #layerseg { display: none !important; }
+  #layers { flex-direction: row; padding: 6px; }
+  #plate .stat:nth-child(4) { display: none; }
+  #plate .des { display: none; }
+  #timeline { grid-column: 1 / -1; order: 5; }
+  .speeds { display: none; }
+  #clock { min-width: 0; }
+  #drawer, #inspector { bottom: 136px; }
+  #plate { left: 70px; padding: 8px 10px; }
+  body.drawer-open #plate { left: 424px; }
+#plate { transition: left .2s ease; }
+#plate h1 { font-size: 18px; }
+  #plate .stats { gap: 4px 10px; }
+  #topright { top: auto; bottom: 132px; }
+  body.insp-open #topright { right: 14px; }
+  #atlas .split { grid-template-columns: 1fr; grid-template-rows: 40% 60%; }
+  #ticker { bottom: 136px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div id="stage">
+  <canvas id="c2d"></canvas>
+  <canvas id="c3d" hidden></canvas>
+</div>
+<div id="vignette"></div>
+<canvas id="grain"></canvas>
+
+<nav id="rail" aria-label="Ferramentas" hidden>
+  <div class="mark"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="#e3a95e" stroke-width="1.2"><circle cx="13" cy="13" r="9"/><path d="M4 13h18M13 4c-4 3-4 15 0 18M13 4c4 3 4 15 0 18"/></svg></div>
+  <button data-tool="observe" class="on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L21 21"/></svg><span class="tip">Observar</span></button>
+  <button data-tool="seed"><svg viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="M12 13c0-4 3-7 7-7 0 4-3 7-7 7zM12 15c0-3-2-5-6-5 0 3 2 5 6 5z"/></svg><span class="tip">Semear vida</span></button>
+  <button data-tool="sculpt"><svg viewBox="0 0 24 24"><path d="M2 19l6-9 4 5 3-4 7 8z"/><path d="M15 6h4M17 4v4"/></svg><span class="tip">Esculpir relevo</span></button>
+  <button data-tool="events"><svg viewBox="0 0 24 24"><circle cx="15" cy="9" r="3"/><path d="M12.5 11.5L4 20M9 9L3 15M15 15l-6 6"/></svg><span class="tip">Eventos</span></button>
+  <button data-tool="vault"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15"/><circle cx="12" cy="12.5" r="3.5"/><path d="M12 9v-1M3 9h2M3 16h2"/></svg><span class="tip">Cofre da Vida</span></button>
+  <button data-tool="atlas"><svg viewBox="0 0 24 24"><path d="M4 20V4M4 8h6v4h6v4h5M10 12V8M16 16v-4M10 8h8"/></svg><span class="tip">Linhagens</span></button>
+  <button data-tool="planet"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><ellipse cx="12" cy="12" rx="11" ry="3.5" transform="rotate(-20 12 12)"/></svg><span class="tip">Planeta</span></button>
+  <button data-tool="chronicle"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4"/></svg><span class="tip">Crônica</span></button>
+  <div class="spacer"></div>
+  <div class="label ver" title="Versão do jogo">v<span class="app-ver"></span></div>
+</nav>
+
+<header id="plate" class="panel" hidden>
+  <h1 id="p-name">—</h1>
+  <div class="des label" id="p-des"></div>
+  <div class="stats">
+    <div class="stat"><span class="label">Temp. média</span><b id="s-temp">—</b></div>
+    <div class="stat"><span class="label">O₂</span><b id="s-o2">—</b></div>
+    <div class="stat good"><span class="label">Espécies</span><b id="s-sp">0</b></div>
+    <div class="stat"><span class="label">Organismos</span><b id="s-pop">0</b></div>
+  </div>
+</header>
+
+<div id="topright" hidden>
+  <div class="panel" id="layers">
+    <div class="seg" id="viewseg"><button data-view="2d" class="on">2D</button><button data-view="3d">3D</button></div>
+    <div class="seg" id="layerseg"><button data-layer="clouds" class="on" title="Nuvens">Nuv</button><button data-layer="night" class="on" title="Dia e noite">Noite</button><button data-layer="moons" class="on" title="Pontos sublunares">Luas</button></div>
+    <div class="seg"><button id="sound-btn" title="Som">Som</button></div>
+  </div>
+  <div class="panel" id="mixer" hidden>
+    <div class="label">Mixagem</div>
+    <div class="field"><div class="top"><span>Geral</span><span id="mv-master">80</span></div><input type="range" id="m-master" min="0" max="100" value="80"></div>
+    <div class="field"><div class="top"><span>Música</span><span id="mv-music">70</span></div><input type="range" id="m-music" min="0" max="100" value="70"></div>
+    <div class="field"><div class="top"><span>Ambiente e fauna</span><span id="mv-amb">80</span></div><input type="range" id="m-amb" min="0" max="100" value="80"></div>
+    <div class="field"><div class="top"><span>Eventos</span><span id="mv-sfx">85</span></div><input type="range" id="m-sfx" min="0" max="100" value="85"></div>
+    <div class="field"><div class="top"><span>Interface</span><span id="mv-ui">60</span></div><input type="range" id="m-ui" min="0" max="100" value="60"></div>
+    <button class="btn small" id="mute-btn">Silenciar</button>
+  </div>
+</div>
+
+<aside id="drawer" class="panel" aria-label="Ferramenta">
+  <div class="dhead"><h2 id="drawer-title">—</h2><button class="x" id="drawer-x" aria-label="Fechar">×</button></div>
+  <div class="dbody" id="drawer-body"></div>
+</aside>
+
+<aside id="inspector" class="panel" aria-label="Inspetor">
+  <div class="dhead">
+    <div class="row" style="justify-content:space-between"><span class="label" id="insp-kind">Indivíduo</span><button class="x" id="insp-x" aria-label="Fechar">×</button></div>
+    <h3 id="insp-name" contenteditable="true" spellcheck="false">—</h3>
+    <div id="insp-common" contenteditable="true" spellcheck="false">—</div>
+  </div>
+  <div class="dbody" id="insp-body"></div>
+</aside>
+
+<div id="ticker"></div>
+<div id="toast" class="panel"></div>
+<div id="modehint" class="modehint panel" hidden></div>
+
+<section id="atlas" class="panel" hidden>
+  <div class="dhead"><h2>Atlas filogenético</h2><button class="x" id="atlas-x" aria-label="Fechar">×</button></div>
+  <div class="bar2">
+    <div class="seg" id="atlas-filter"><button data-f="living" class="on">Vivas</button><button data-f="all">Todas</button><button data-f="major">Linhagens maiores</button></div>
+    <input type="text" id="atlas-search" placeholder="Buscar espécie, gênero ou nome popular" style="max-width:300px">
+    <span class="label" id="atlas-count"></span>
+  </div>
+  <div class="split">
+    <div id="tree-wrap"><canvas id="tree"></canvas></div>
+    <div id="table-wrap"></div>
+  </div>
+</section>
+
+<footer id="console" class="panel" hidden>
+  <div class="tc">
+    <button class="tbtn" id="t-back" title="Voltar no tempo (passo anterior salvo)"><svg viewBox="0 0 24 24"><path d="M11 6v12L3 12zM20 6v12l-8-6z"/></svg></button>
+    <button class="tbtn" id="t-play" title="Pausar / continuar (espaço)"><svg viewBox="0 0 24 24" id="t-play-ic"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></button>
+    <button class="tbtn" id="t-step" title="Avançar um passo"><svg viewBox="0 0 24 24"><path d="M5 6v12l9-6zM16 6h3v12h-3z"/></svg></button>
+  </div>
+  <div class="speeds"><span class="label">Velocidade</span><div class="seg" id="speedseg"><button data-s="1">1×</button><button data-s="2" class="on">2×</button><button data-s="3">4×</button><button data-s="4">8×</button><button data-s="5">16×</button></div></div>
+  <div id="timeline"><canvas id="tl"></canvas><div id="rewind-ask" class="panel" hidden><p id="rw-text"></p><div class="row"><button class="btn small primary" id="rw-yes">Voltar no tempo</button><button class="btn small" id="rw-no">Cancelar</button></div></div></div>
+  <div style="display:flex">
+    <div id="scale-box"><span class="label">Cada passo dura</span><div class="val"><button id="sc-dn" aria-label="Escala menor">−</button><b id="sc-val">1 Ma</b><button id="sc-up" aria-label="Escala maior">+</button></div></div>
+    <div id="clock"><span class="label">Idade da biosfera</span><b id="clock-val">0</b></div>
+  </div>
+</footer>
+
+<section id="genesis">
+  <div class="hero">
+    <h1>Tempo<span>Profundo</span></h1>
+    <p>Escolha um mundo, plante uma forma de vida mínima e acompanhe o que a seleção natural faz com ela ao longo de centenas de milhões de anos.</p>
+  </div>
+  <div class="side">
+    <div>
+      <div class="label" id="g-des">—</div>
+      <h2 id="g-name" style="margin-top:6px">—</h2>
+    </div>
+    <div class="pfacts" id="g-facts"></div>
+    <div class="row">
+      <button class="btn" id="g-roll">Sortear outro mundo</button>
+      <button class="btn" id="g-edit">Ajustar parâmetros</button>
+    </div>
+    <div class="label" style="margin-top:6px">Primeira forma de vida</div>
+    <div class="choices" id="g-kinds"></div>
+    <p class="hint" id="g-kind-desc"></p>
+    <div class="row">
+      <button class="btn primary" id="g-start">Iniciar a biosfera</button>
+      <button class="btn" id="g-empty">Planeta estéril</button>
+    </div>
+    <p class="hint">O som é parte do jogo. Use fones se puder.</p>
+    <p class="label">Versão <span class="app-ver"></span> · <span class="app-ver-name"></span></p>
+  </div>
+</section>
+<!--APP-->

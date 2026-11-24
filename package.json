@@ -1,0 +1,17 @@
+{
+  "name": "tempo-profundo",
+  "version": "1.1.0",
+  "description": "Simulador de evolução planetária com som procedural",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.128.0"
+  },
+  "type": "module"
+}

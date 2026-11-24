@@ -1,0 +1,20 @@
+const { chromium } = require('playwright'); const path=require('path');
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+  const p = await b.newPage({ viewport: { width: 1440, height: 880 } });
+  p.on('pageerror', e => console.log('pageerror', e.message));
+  await p.route('**/three.min.js', r => r.fulfill({ path: path.resolve('node_modules/three/build/three.min.js'), contentType: 'application/javascript' }));
+  await p.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '', contentType: 'text/css' }));
+  await p.goto('file://' + path.resolve('dist/play.html'));
+  await p.waitForTimeout(1000);
+  await p.click('#g-empty');
+  await p.evaluate(() => { app.primordialSoup(); const w = app.world; for (let i = 0; i < 1500; i++) w.step(); w.scaleIdx = 1; for (let i = 0; i < 600; i++) w.step(); app.updateScale(); app.togglePause(); });
+  const box = await p.locator('#tl').boundingBox();
+  await p.mouse.click(box.x + box.width * 0.4, box.y + box.height / 2);
+  await p.waitForTimeout(400);
+  await p.screenshot({ path: '/tmp/claude-0/shots/16-rewind.png' });
+  const before = await p.evaluate(() => app.world.years);
+  await p.click('#rw-yes'); await p.waitForTimeout(300);
+  console.log('antes', (before/1e9).toFixed(3), 'Ga → depois', (await p.evaluate(() => app.world.years)/1e9).toFixed(3), 'Ga; vivas', await p.evaluate(() => app.world.living));
+  await b.close();
+})();

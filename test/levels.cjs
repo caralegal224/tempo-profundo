@@ -1,0 +1,24 @@
+const { chromium } = require('playwright'); const path=require('path');
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  p.on('pageerror', e => console.log('pageerror', e.message));
+  await p.route('**/three.min.js', r => r.fulfill({ path: path.resolve('node_modules/three/build/three.min.js'), contentType: 'application/javascript' }));
+  await p.route('https://fonts.googleapis.com/**', r => r.fulfill({ body: '', contentType: 'text/css' }));
+  await p.goto('file://' + path.resolve('dist/play.html'));
+  await p.waitForTimeout(1500);
+  await p.click('#g-start');
+  await p.waitForTimeout(300);
+  await p.evaluate(() => { const a = app.audio; const an = a.ctx.createAnalyser(); an.fftSize = 2048; a.master.connect(an); window.__an = an; window.__meas = () => { const d = new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let pk=0, s=0; for (const x of d){ pk=Math.max(pk,Math.abs(x)); s+=x*x; } return [pk, Math.sqrt(s/d.length)]; }; });
+  const measure = async (label, ms) => { let pk=0, rms=0, n=0; const t0=Date.now(); while(Date.now()-t0<ms){ const [a,r]=await p.evaluate(()=>__meas()); pk=Math.max(pk,a); rms+=r; n++; await p.waitForTimeout(50);} console.log(label.padEnd(18), 'peak', pk.toFixed(3), 'rms', (rms/n).toFixed(4)); };
+  await measure('ambiente', 4000);
+  await p.evaluate(() => app.audio.update({ closeness: 1, animals: 800, micro: 3000, plants: 1000, animalVoices: [ {freq:900,notes:3,len:0.08,gap:0.05,sweep:1.3,interval:0.25,ratio:1.5,fm:0.4,wave:'sine',low:false}, {freq:200,notes:2,len:0.3,gap:0.1,sweep:0.7,interval:0.1,ratio:1,fm:0.2,wave:'triangle',low:true} ] }));
+  await measure('perto c/ fauna', 4000);
+  await p.evaluate(() => app.audio.stinger('impact', { radius: 0.1 }));
+  await measure('impacto', 5000);
+  await p.evaluate(() => app.audio.stinger('massExtinction'));
+  await measure('ext. em massa', 4000);
+  await p.evaluate(() => { app.audio.stinger('innovation'); });
+  await measure('inovação', 2500);
+  await b.close();
+})();

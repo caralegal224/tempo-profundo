@@ -1,0 +1,11 @@
+import { build } from 'esbuild';
+import fs from 'fs';
+const r = await build({ entryPoints: ['src/main.js'], bundle: true, format: 'iife', minify: true, write: false, target: 'es2020', legalComments: 'none' });
+const js = r.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+const tpl = fs.readFileSync('src/index.html', 'utf8');
+const three = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>';
+const page = tpl.replace('<!--APP-->', () => three + '\n<script>' + js + '</script>');
+fs.mkdirSync('dist', { recursive: true });
+fs.writeFileSync('dist/tempo-profundo.html', page);
+fs.writeFileSync('dist/play.html', `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>${page}</body></html>`);
+console.log('ok', (page.length / 1024).toFixed(0), 'KB');
